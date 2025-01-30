@@ -94,7 +94,11 @@ class SpoaServer:
     async def handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         conn = SpoaConnection(writer, self.handlers)
 
-        haproxy_hello_frame = await Frame.read_frame(reader)
+        try:
+            haproxy_hello_frame = await Frame.read_frame(reader)
+        except asyncio.exceptions.IncompleteReadError:
+            conn.logger.info("Incomplete read, exiting")
+            return
 
         if not haproxy_hello_frame.headers.is_haproxy_hello():
             conn.logger.error(f"""
