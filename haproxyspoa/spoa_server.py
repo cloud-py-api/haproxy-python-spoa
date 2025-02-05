@@ -66,7 +66,7 @@ class SpoaConnection:
 
     async def handle_hello_handshake(self, frame: Frame):
         capabilities = AgentCapabilities()
-        self.logger.info(f"Received `hello handshake`, responding with agent capabilities of: '{capabilities}'")
+        self.logger.debug(f"Received `hello handshake`, responding with agent capabilities of: '{capabilities}'")
         agent_hello_frame = AgentHelloFrame(
             payload=AgentHelloPayload(
                 capabilities=capabilities,
@@ -97,7 +97,7 @@ class SpoaServer:
         try:
             haproxy_hello_frame = await Frame.read_frame(reader)
         except asyncio.exceptions.IncompleteReadError:
-            conn.logger.info("Incomplete read, exiting")
+            conn.logger.debug("Incomplete read, exiting")
             return
 
         if not haproxy_hello_frame.headers.is_haproxy_hello():
@@ -110,14 +110,14 @@ class SpoaServer:
         await conn.handle_hello_handshake(haproxy_hello_frame)
 
         if HaproxyHelloPayload(haproxy_hello_frame.payload).healthcheck():
-            conn.logger.info("Health check, immediately disconnecting")
+            conn.logger.debug("Health check, immediately disconnecting")
             return
 
         while True:
             try:
                 frame = await Frame.read_frame(reader)
             except Exception as e:
-                conn.logger.info("Exception %s during reading frame.", e)
+                conn.logger.debug("Exception %s during reading frame.", e)
                 return
 
             if frame.headers.is_haproxy_disconnect():
