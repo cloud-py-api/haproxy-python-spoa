@@ -114,7 +114,11 @@ class SpoaServer:
             return
 
         while True:
-            frame = await Frame.read_frame(reader)
+            try:
+                frame = await Frame.read_frame(reader)
+            except Exception as e:
+                conn.logger.info("Exception %s during reading frame.", e)
+                return
 
             if frame.headers.is_haproxy_disconnect():
                 await conn.handle_haproxy_disconnect(frame)
