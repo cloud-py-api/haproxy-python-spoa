@@ -103,9 +103,10 @@ class Frame:
         frame_payload_bytes = self.payload.getvalue()
         frame_length = len(frame_header_bytes) + len(frame_payload_bytes)
 
-        writer.write(frame_length.to_bytes(4, byteorder='big'))
-        writer.write(frame_header_bytes)
-        writer.write(frame_payload_bytes)
+        # Emit the whole frame in a single write so it leaves as one TCP segment
+        # whenever it fits: HAProxy 3.2+ (rewritten SPOP mux) intermittently resets
+        # connections whose AGENT-HELLO arrives split across several segments.
+        writer.write(frame_length.to_bytes(4, byteorder='big') + frame_header_bytes + frame_payload_bytes)
         await writer.drain()
 
 
