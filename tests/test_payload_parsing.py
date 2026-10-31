@@ -2,7 +2,7 @@ import io
 import ipaddress
 import unittest
 
-from haproxyspoa.spoa_data_types import write_string, write_typed_autodetect
+from haproxyspoa.spoa_data_types import parse_string, write_binary, write_string, write_typed_autodetect
 from haproxyspoa.spoa_payloads import write_kv_list, parse_kv_list, parse_list_of_messages
 
 
@@ -41,6 +41,30 @@ class TestPayloadParsing(unittest.TestCase):
                 "mars": 1
             }
         })
+
+    def test_string_with_bytes_above_0x7f(self):
+        # A Cookie header whose value holds "%e4", which a proxy in front URL-decoded into the
+        # single byte 0xE4 ("ä" in Latin-1), and a UTF-8 "ł" (0xC5 0x82). Raised
+        # UnicodeDecodeError with ASCII, which killed the agent's connection.
+        raw = b"cookie: a=b; session=iI6tu#w3\xe4CaJ; name=Pawe\xc5\x82"
+        value = parse_string(io.BytesIO(write_binary(raw)))
+
+        self.assertEqual(len(value), len(raw))
+        self.assertEqual(write_string(value), write_binary(raw))
+
+    def test_message_with_non_ascii_header_value(self):
+        buffer = io.BytesIO()
+        buffer.write(write_string("check-request"))
+        buffer.write(bytes([1]))
+        buffer.write(write_kv_list({"headers": b"\x08" + write_binary(b"referer: https://example.org/K\xe4se\r\n")}))
+
+        buffer.seek(0)
+        messages = parse_list_of_messages(buffer)
+
+        self.assertEqual(
+            messages["check-request"]["headers"].encode("latin-1"),
+            b"referer: https://example.org/K\xe4se\r\n",
+        )
 
 
 if __name__ == '__main__':

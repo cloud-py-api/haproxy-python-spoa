@@ -81,11 +81,17 @@ def parse_binary(buffer: io.BytesIO) -> bytes:
     return buffer.read(bytes_length)
 
 
+# SPOP strings are bytes with a length, not text in a given encoding: HAProxy passes header
+# values, paths and cookies as it received them, and HTTP allows bytes above 0x7F there
+# (obs-text), e.g. a cookie value or a Referer that a client or proxy did not percent-encode.
+# Latin-1 maps each of the 256 byte values to one character and back, so any string HAProxy
+# sends can be read, and written back unchanged; ASCII raised on the first byte above 0x7F.
+STRING_ENCODING = "latin-1"
+
+
 def parse_string(buffer: io.BytesIO) -> str:
     _bytes = parse_binary(buffer)
-    # The actual encoding is not well documented, but other agents have used ASCII.
-    # Based on some offhand remarks in an Haproxy blog post, this seems probable.
-    return _bytes.decode("ascii")
+    return _bytes.decode(STRING_ENCODING)
 
 
 def parse_typed_data(buffer: io.BytesIO):
@@ -152,7 +158,7 @@ def write_binary(value: bytes) -> bytes:
 
 
 def write_string(value: str) -> bytes:
-    return write_binary(value.encode("ascii"))
+    return write_binary(value.encode(STRING_ENCODING))
 
 
 def write_datatype(_type: int, flags: int = 0) -> bytes:
